@@ -109,6 +109,50 @@ Projeto desenvolvido para fins de estudo e aplicação prática de análise de d
 
 ---
 
+## Level UP - Sistema Inteligente de Monitoramento de Saude
+
+O **Level UP** e uma evolucao estrategica que transforma a experiencia de saude corporativa em um modelo mais inteligente, proativo e centrado no paciente. O projeto e simulado no **Wokwi** utilizando **ESP32**.
+
+### Tres Pilares
+
+1. **Monitoramento Continuo via Wearables** - Frequencia cardiaca, atividade fisica, temperatura corporal
+2. **Check-up Digital com IA** - Triagem adaptativa com score de risco automatizado
+3. **Gamificacao** - Pontos, niveis e ranks para engajamento em habitos saudaveis
+
+### Componentes do Circuito (Wokwi)
+
+| Componente | Funcao |
+|---|---|
+| ESP32 DevKit V1 | Microcontrolador principal |
+| OLED SSD1306 128x64 | Display de dados e interface |
+| DHT22 | Sensor de temperatura e umidade |
+| 2x Potenciometros | Simulam sensor cardiaco e acelerometro |
+| 3x LEDs (Verde/Amarelo/Vermelho) | Indicadores de status de saude |
+| Buzzer | Alarme para alertas criticos |
+| 2x Botoes | Navegacao e interacao |
+
+### Como Executar no Wokwi
+
+1. Acesse [wokwi.com](https://wokwi.com)
+2. Crie um novo projeto ESP32
+3. Copie o conteudo de `level-up-wokwi/diagram.json` para o arquivo de diagrama
+4. Copie o conteudo de `level-up-wokwi/sketch.ino` para o arquivo de codigo
+5. Instale as bibliotecas listadas em `level-up-wokwi/libraries.txt`
+6. Execute a simulacao
+
+### Navegacao
+
+- **BTN_MENU (azul)**: Navegar entre telas (Dashboard, Vitais, Check-up, Gamificacao)
+- **BTN_SELECT (verde)**: Interagir (responder perguntas do check-up, confirmar alertas)
+
+### Arquivos
+
+- `level-up-wokwi/diagram.json` - Circuito completo do Wokwi
+- `level-up-wokwi/sketch.ino` - Codigo Arduino para ESP32
+- `level-up-wokwi/libraries.txt` - Bibliotecas necessarias
+
+---
+
 Nicolas Araujo de Oliveira RM 566780
 
 Pedro Ivson Falcao De Leucas RM 
