@@ -109,7 +109,7 @@ Projeto desenvolvido para fins de estudo e aplicação prática de análise de d
 
 ---
 
-## Level UP - Sistema Inteligente de Monitoramento de Saude
+## Level UP - Sistema Inteligente de Monitoramento de Saude (v2.0)
 
 O **Level UP** e uma evolucao estrategica que transforma a experiencia de saude corporativa em um modelo mais inteligente, proativo e centrado no paciente. O projeto e simulado no **Wokwi** utilizando **ESP32**.
 
@@ -118,6 +118,15 @@ O **Level UP** e uma evolucao estrategica que transforma a experiencia de saude 
 1. **Monitoramento Continuo via Wearables** - Frequencia cardiaca, atividade fisica, temperatura corporal
 2. **Check-up Digital com IA** - Triagem adaptativa com score de risco automatizado
 3. **Gamificacao** - Pontos, niveis e ranks para engajamento em habitos saudaveis
+
+### Novidades v2.0 - Relogio + WiFi + Dashboard Web
+
+- **Relogio em tempo real** (software clock via `millis()`) exibido no OLED e no dashboard web
+- **WiFi Access Point** integrado ao ESP32 - o dispositivo cria sua propria rede WiFi
+- **Web Server** com dashboard HTML responsivo servido diretamente pelo ESP32
+- **API REST** para dados de saude em tempo real (`/api/data`)
+- **Ajuste de relogio** via web (`/api/settime?h=HH&m=MM`)
+- **Nova tela OLED** dedicada ao relogio com informacoes de conexao WiFi
 
 ### Componentes do Circuito (Wokwi)
 
@@ -140,15 +149,66 @@ O **Level UP** e uma evolucao estrategica que transforma a experiencia de saude 
 5. Instale as bibliotecas listadas em `level-up-wokwi/libraries.txt`
 6. Execute a simulacao
 
-### Navegacao
+### Acessando o Dashboard Web
 
-- **BTN_MENU (azul)**: Navegar entre telas (Dashboard, Vitais, Check-up, Gamificacao)
+1. Conecte-se a rede WiFi criada pelo ESP32:
+   - **SSID:** `LevelUP-Health`
+   - **Senha:** `levelup123`
+2. Abra o navegador e acesse: `http://192.168.4.1`
+3. O dashboard mostra em tempo real:
+   - Relogio com hora, minuto e segundo
+   - Frequencia cardiaca (BPM)
+   - Temperatura corporal
+   - Nivel de atividade fisica
+   - Qualidade do sono
+   - Contagem de passos
+   - Nivel, rank e pontos de gamificacao
+   - Status de alerta (Normal / Atencao / Critico)
+4. Para ajustar o relogio, use os campos HH:MM no topo do dashboard
+
+### API REST
+
+| Endpoint | Metodo | Descricao |
+|---|---|---|
+| `/` | GET | Dashboard HTML completo |
+| `/api/data` | GET | Dados de saude em JSON (atualiza a cada 2s) |
+| `/api/settime?h=HH&m=MM` | GET | Ajustar hora do relogio |
+
+Exemplo de resposta `/api/data`:
+```json
+{
+  "time": "12:30:45",
+  "bpm": 75,
+  "temp": 36.5,
+  "activity": 45,
+  "steps": 6750,
+  "sleep": 72,
+  "level": 2,
+  "rank": "Iniciante",
+  "points": 150,
+  "checkups": 1,
+  "alert": 0
+}
+```
+
+### Navegacao no OLED
+
+- **BTN_MENU (azul)**: Navegar entre telas (Dashboard, Relogio, Vitais, Check-up, Gamificacao)
 - **BTN_SELECT (verde)**: Interagir (responder perguntas do check-up, confirmar alertas)
+
+### Telas do OLED
+
+1. **Dashboard** - Visao geral com relogio, BPM, temperatura, atividade e gamificacao
+2. **Relogio** - Hora em formato grande + informacoes WiFi (SSID e IP)
+3. **Sinais Vitais** - Detalhamento completo dos sensores
+4. **Check-up Digital** - 8 perguntas com score de risco
+5. **Gamificacao** - Nivel, rank, pontos e progresso
+6. **Alerta** - Tela automatica para situacoes criticas
 
 ### Arquivos
 
 - `level-up-wokwi/diagram.json` - Circuito completo do Wokwi
-- `level-up-wokwi/sketch.ino` - Codigo Arduino para ESP32
+- `level-up-wokwi/sketch.ino` - Codigo Arduino para ESP32 (v2.0 com WiFi + Dashboard)
 - `level-up-wokwi/libraries.txt` - Bibliotecas necessarias
 
 ---

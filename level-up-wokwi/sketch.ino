@@ -2,6 +2,7 @@
  * ============================================================
  *  LEVEL UP - Sistema Inteligente de Monitoramento de Saude
  *  Plataforma: ESP32 + Simulacao Wokwi
+ *  Versao 2.0 - Com Relogio, WiFi e Dashboard Web
  * ============================================================
  *
  *  Tres Pilares:
@@ -20,6 +21,14 @@
  *       - Niveis e ranks progressivos
  *       - Recompensas por checkups e metas atingidas
  *
+ *  Novidades v2.0:
+ *    - Relogio em tempo real (software clock)
+ *    - WiFi Access Point integrado
+ *    - Web Server com Dashboard HTML responsivo
+ *    - API REST para dados de saude (/api/data)
+ *    - Endpoint para ajustar relogio (/api/settime?h=HH&m=MM)
+ *    - Nova tela de relogio no OLED
+ *
  *  Componentes:
  *    - ESP32 DevKit V1
  *    - Display OLED SSD1306 128x64 (I2C)
@@ -37,6 +46,8 @@
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 #include <DHT.h>
+#include <WiFi.h>
+#include <WebServer.h>
 
 /* ======================== PINOS ======================== */
 #define HEART_RATE_PIN  34
@@ -58,6 +69,11 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 /* ======================== DHT22 ======================== */
 #define DHT_TYPE DHT22
 DHT dht(DHT_PIN, DHT_TYPE);
+
+/* ===================== WIFI + WEB ====================== */
+const char* ap_ssid = "LevelUP-Health";
+const char* ap_pass = "levelup123";
+WebServer server(80);
 
 /* ==================== ESTRUTURAS ======================= */
 
@@ -89,6 +105,7 @@ struct CheckupData {
 /* ==================== TELAS (ENUM) ===================== */
 enum Screen {
   SCREEN_DASHBOARD,
+  SCREEN_CLOCK,
   SCREEN_VITALS,
   SCREEN_CHECKUP,
   SCREEN_GAMIFICATION,
@@ -101,6 +118,7 @@ HealthData health;
 GameData game;
 CheckupData checkup;
 Screen currentScreen = SCREEN_DASHBOARD;
+int currentAlertLevel = 0;
 
 unsigned long lastSensorRead = 0;
 unsigned long lastDisplayUpdate = 0;
@@ -112,6 +130,12 @@ const unsigned long SENSOR_INTERVAL  = 2000;
 const unsigned long DISPLAY_INTERVAL = 500;
 const unsigned long POINT_INTERVAL   = 30000;
 const unsigned long DEBOUNCE_DELAY   = 300;
+
+/* ================== RELOGIO SOFTWARE =================== */
+int clockH = 12;
+int clockM = 0;
+int clockS = 0;
+unsigned long lastClockTick = 0;
 
 /* ============= PERGUNTAS DO CHECK-UP =================== */
 const char* questions[] = {
@@ -127,13 +151,142 @@ const char* questions[] = {
 const int weights[] = {20, 15, 10, 5, 8, 12, 18, 7};
 const int NUM_QUESTIONS = 8;
 
+/* ============= PAGINA HTML (PROGMEM) =================== */
+const char PAGE_HTML[] PROGMEM = R"rawliteral(
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Level UP - Health Dashboard</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',Tahoma,sans-serif;background:#0f0f1a;color:#e0e0e0;min-height:100vh}
+.hdr{text-align:center;padding:18px;background:linear-gradient(135deg,#1a1a3e,#16213e);border-bottom:2px solid #00ff88}
+.hdr h1{color:#00ff88;font-size:1.8em;letter-spacing:2px}
+.hdr p{color:#888;font-size:0.85em;margin-top:4px}
+.clk-box{text-align:center;padding:24px 10px;background:#111128}
+.clk{font-size:4.5em;font-weight:700;color:#00ff88;font-family:'Courier New',monospace;text-shadow:0 0 20px rgba(0,255,136,0.3)}
+.clk-lbl{color:#666;font-size:0.85em;margin-top:4px}
+.st-bar{text-align:center;padding:10px;font-weight:700;font-size:1em;letter-spacing:1px}
+.st-ok{background:#1b5e20;color:#a5d6a7}
+.st-warn{background:#e65100;color:#ffe0b2}
+.st-crit{background:#b71c1c;color:#ffcdd2;animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.6}}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;padding:18px;max-width:960px;margin:0 auto}
+.card{background:#16213e;border-radius:12px;padding:18px;border-left:4px solid;transition:transform 0.2s}
+.card:hover{transform:translateY(-2px)}
+.card h3{font-size:0.75em;text-transform:uppercase;letter-spacing:1px;opacity:0.6;margin-bottom:8px}
+.card .v{font-size:2.2em;font-weight:700}
+.card .u{font-size:0.65em;opacity:0.5;margin-left:3px}
+.c-hr{border-color:#ff6b6b}.c-hr .v{color:#ff6b6b}
+.c-tp{border-color:#ffd93d}.c-tp .v{color:#ffd93d}
+.c-ac{border-color:#6bcb77}.c-ac .v{color:#6bcb77}
+.c-sl{border-color:#4d96ff}.c-sl .v{color:#4d96ff}
+.c-st{border-color:#cc65fe}.c-st .v{color:#cc65fe}
+.c-gm{border-color:#ff6b9d}.c-gm .v{color:#ff6b9d}
+.bar{height:7px;background:#1a1a3e;border-radius:4px;margin-top:10px;overflow:hidden}
+.bf{height:100%;border-radius:4px;transition:width 0.5s ease}
+.bg .bf{background:linear-gradient(90deg,#00ff88,#00cc6a)}
+.bb .bf{background:linear-gradient(90deg,#4d96ff,#2979ff)}
+.bp .bf{background:linear-gradient(90deg,#ff6b9d,#ff4081)}
+.badge{display:inline-block;background:#2a2a5e;padding:3px 10px;border-radius:16px;font-size:0.8em;margin-top:6px;color:#ff6b9d}
+.ft{text-align:center;padding:14px;color:#444;font-size:0.75em;border-top:1px solid #1a1a3e;margin-top:16px}
+.tf{text-align:center;padding:10px;background:#111128}
+.tf input{width:50px;padding:4px;background:#1a1a3e;color:#00ff88;border:1px solid #333;border-radius:4px;text-align:center;font-size:1em}
+.tf button{padding:5px 16px;background:#00ff88;color:#0f0f1a;border:none;border-radius:4px;cursor:pointer;font-weight:700;margin-left:8px}
+.tf button:hover{background:#00cc6a}
+</style>
+</head>
+<body>
+<div class="hdr">
+<h1>LEVEL UP</h1>
+<p>Health Monitoring System v2.0</p>
+</div>
+<div class="clk-box">
+<div class="clk" id="clk">--:--:--</div>
+<div class="clk-lbl">Relogio em Tempo Real</div>
+</div>
+<div class="tf">
+<label>Ajustar: </label>
+<input type="number" id="sh" min="0" max="23" placeholder="HH">
+<span style="color:#666">:</span>
+<input type="number" id="sm" min="0" max="59" placeholder="MM">
+<button onclick="setT()">OK</button>
+</div>
+<div class="st-bar st-ok" id="st">Conectando...</div>
+<div class="grid">
+<div class="card c-hr">
+<h3>Frequencia Cardiaca</h3>
+<div><span class="v" id="bpm">--</span><span class="u">BPM</span></div>
+</div>
+<div class="card c-tp">
+<h3>Temperatura</h3>
+<div><span class="v" id="tmp">--</span><span class="u">&deg;C</span></div>
+</div>
+<div class="card c-ac">
+<h3>Atividade Fisica</h3>
+<div><span class="v" id="act">--</span><span class="u">%</span></div>
+<div class="bar bg"><div class="bf" id="ab" style="width:0%"></div></div>
+</div>
+<div class="card c-sl">
+<h3>Qualidade do Sono</h3>
+<div><span class="v" id="slp">--</span><span class="u">%</span></div>
+<div class="bar bb"><div class="bf" id="sb" style="width:0%"></div></div>
+</div>
+<div class="card c-st">
+<h3>Passos</h3>
+<div><span class="v" id="stp">--</span></div>
+</div>
+<div class="card c-gm">
+<h3>Gamificacao</h3>
+<div><span class="v" id="lv">--</span></div>
+<div class="badge" id="rk">--</div>
+<div style="margin-top:8px;font-size:0.85em">Pontos: <strong id="pt">0</strong></div>
+<div style="font-size:0.8em;color:#888;margin-top:3px">Checkups: <span id="ck">0</span></div>
+<div class="bar bp"><div class="bf" id="lb" style="width:0%"></div></div>
+</div>
+</div>
+<div class="ft">Level UP - ESP32 Health Monitor - WiFi Dashboard</div>
+<script>
+function u(){
+fetch('/api/data').then(function(r){return r.json()}).then(function(d){
+document.getElementById('clk').textContent=d.time;
+document.getElementById('bpm').textContent=d.bpm;
+document.getElementById('tmp').textContent=d.temp;
+document.getElementById('act').textContent=d.activity;
+document.getElementById('ab').style.width=d.activity+'%';
+document.getElementById('slp').textContent=d.sleep;
+document.getElementById('sb').style.width=d.sleep+'%';
+document.getElementById('stp').textContent=d.steps;
+document.getElementById('lv').textContent='Nivel '+d.level;
+document.getElementById('rk').textContent=d.rank;
+document.getElementById('pt').textContent=d.points;
+document.getElementById('ck').textContent=d.checkups;
+document.getElementById('lb').style.width=(d.points%100)+'%';
+var s=document.getElementById('st');
+if(d.alert===2){s.className='st-bar st-crit';s.textContent='ALERTA CRITICO - SINAIS ANORMAIS';}
+else if(d.alert===1){s.className='st-bar st-warn';s.textContent='ATENCAO - VALORES FORA DO NORMAL';}
+else{s.className='st-bar st-ok';s.textContent='NORMAL - SINAIS VITAIS ESTAVEIS';}
+}).catch(function(){});}
+function setT(){
+var h=document.getElementById('sh').value;
+var m=document.getElementById('sm').value;
+if(h!==''&&m!=='')fetch('/api/settime?h='+h+'&m='+m).then(function(){u();});
+}
+setInterval(u,2000);u();
+</script>
+</body>
+</html>
+)rawliteral";
+
 /* ======================= SETUP ========================= */
 void setup() {
   Serial.begin(115200);
   Serial.println();
   Serial.println("============================================");
   Serial.println("  LEVEL UP - Health Monitoring System");
-  Serial.println("  Versao 1.0 | Plataforma ESP32");
+  Serial.println("  Versao 2.0 | ESP32 + WiFi + Dashboard");
   Serial.println("============================================");
 
   pinMode(GREEN_LED, OUTPUT);
@@ -153,15 +306,22 @@ void setup() {
   showSplashScreen();
   initGameData();
   resetCheckup();
+  setupWiFi();
+  setupWebServer();
 
   Serial.println("[OK] Sistema inicializado com sucesso!");
   Serial.println("[INFO] Navegue com BTN_MENU, interaja com BTN_SELECT");
+  Serial.print("[WIFI] Dashboard: http://");
+  Serial.println(WiFi.softAPIP());
   Serial.println("--------------------------------------------\n");
 }
 
 /* ======================= LOOP ========================== */
 void loop() {
   unsigned long now = millis();
+
+  updateClock();
+  server.handleClient();
 
   if (now - lastSensorRead >= SENSOR_INTERVAL) {
     readSensors();
@@ -178,6 +338,101 @@ void loop() {
   }
 }
 
+/* ================ CONFIGURACAO WIFI ==================== */
+void setupWiFi() {
+  Serial.print("[WIFI] Criando Access Point: ");
+  Serial.println(ap_ssid);
+  WiFi.softAP(ap_ssid, ap_pass);
+  Serial.print("[WIFI] IP do AP: ");
+  Serial.println(WiFi.softAPIP());
+}
+
+/* ============= CONFIGURACAO WEB SERVER ================= */
+void setupWebServer() {
+  server.on("/", handleRoot);
+  server.on("/api/data", handleApiData);
+  server.on("/api/settime", handleSetTime);
+  server.begin();
+  Serial.println("[WEB] Servidor HTTP iniciado na porta 80");
+}
+
+/* ============= HANDLER: PAGINA PRINCIPAL =============== */
+void handleRoot() {
+  server.send_P(200, "text/html", PAGE_HTML);
+}
+
+/* ============= HANDLER: API DE DADOS =================== */
+void handleApiData() {
+  char timeStr[9];
+  sprintf(timeStr, "%02d:%02d:%02d", clockH, clockM, clockS);
+
+  String json = "{";
+  json += "\"time\":\"";
+  json += timeStr;
+  json += "\",\"bpm\":";
+  json += String(health.heartRate);
+  json += ",\"temp\":";
+  json += String(health.temperature, 1);
+  json += ",\"humidity\":";
+  json += String(health.humidity, 1);
+  json += ",\"activity\":";
+  json += String(health.activityLevel);
+  json += ",\"steps\":";
+  json += String(health.steps);
+  json += ",\"sleep\":";
+  json += String(health.sleepQuality);
+  json += ",\"level\":";
+  json += String(game.level);
+  json += ",\"rank\":\"";
+  json += String(game.rank);
+  json += "\",\"points\":";
+  json += String(game.points);
+  json += ",\"checkups\":";
+  json += String(game.totalCheckups);
+  json += ",\"alert\":";
+  json += String(currentAlertLevel);
+  json += ",\"risk\":";
+  json += String(checkup.riskScore);
+  json += "}";
+
+  server.send(200, "application/json", json);
+}
+
+/* ============= HANDLER: AJUSTAR RELOGIO ================ */
+void handleSetTime() {
+  if (server.hasArg("h") && server.hasArg("m")) {
+    clockH = server.arg("h").toInt() % 24;
+    clockM = server.arg("m").toInt() % 60;
+    clockS = 0;
+    Serial.print("[RELOGIO] Horario ajustado: ");
+    char buf[9];
+    sprintf(buf, "%02d:%02d:%02d", clockH, clockM, clockS);
+    Serial.println(buf);
+    server.send(200, "application/json", "{\"ok\":true}");
+  } else {
+    server.send(400, "application/json", "{\"error\":\"Envie ?h=HH&m=MM\"}");
+  }
+}
+
+/* ================ RELOGIO SOFTWARE ===================== */
+void updateClock() {
+  if (millis() - lastClockTick >= 1000) {
+    lastClockTick = millis();
+    clockS++;
+    if (clockS >= 60) {
+      clockS = 0;
+      clockM++;
+    }
+    if (clockM >= 60) {
+      clockM = 0;
+      clockH++;
+    }
+    if (clockH >= 24) {
+      clockH = 0;
+    }
+  }
+}
+
 /* ================ TELA DE SPLASH ======================= */
 void showSplashScreen() {
   display.clearDisplay();
@@ -188,8 +443,8 @@ void showSplashScreen() {
   display.setTextSize(1);
   display.setCursor(12, 28);
   display.println("Health  Monitoring");
-  display.setCursor(28, 40);
-  display.println("System v1.0");
+  display.setCursor(20, 40);
+  display.println("System v2.0");
 
   display.drawRect(0, 0, 128, 64, SSD1306_WHITE);
 
@@ -243,25 +498,25 @@ void readSensors() {
 
 /* ============ AVALIACAO DE SAUDE + LEDS ================ */
 void evaluateHealth() {
-  int alertLevel = 0;
+  currentAlertLevel = 0;
 
   if (health.heartRate < 50 || health.heartRate > 160) {
-    alertLevel = 2;
+    currentAlertLevel = 2;
   } else if (health.heartRate < 60 || health.heartRate > 100) {
-    alertLevel = max(alertLevel, 1);
+    currentAlertLevel = max(currentAlertLevel, 1);
   }
 
   if (health.temperature > 39.0 || health.temperature < 34.0) {
-    alertLevel = 2;
+    currentAlertLevel = 2;
   } else if (health.temperature > 37.5 || health.temperature < 35.5) {
-    alertLevel = max(alertLevel, 1);
+    currentAlertLevel = max(currentAlertLevel, 1);
   }
 
-  digitalWrite(GREEN_LED, alertLevel == 0 ? HIGH : LOW);
-  digitalWrite(YELLOW_LED, alertLevel == 1 ? HIGH : LOW);
-  digitalWrite(RED_LED, alertLevel == 2 ? HIGH : LOW);
+  digitalWrite(GREEN_LED, currentAlertLevel == 0 ? HIGH : LOW);
+  digitalWrite(YELLOW_LED, currentAlertLevel == 1 ? HIGH : LOW);
+  digitalWrite(RED_LED, currentAlertLevel == 2 ? HIGH : LOW);
 
-  if (alertLevel == 2) {
+  if (currentAlertLevel == 2) {
     if ((millis() / 500) % 2 == 0) {
       tone(BUZZER_PIN, 1000);
     } else {
@@ -277,7 +532,7 @@ void evaluateHealth() {
 
   const char* statusLabels[] = {"NORMAL", "ATENCAO", "CRITICO"};
   Serial.print("  Status: ");
-  Serial.println(statusLabels[alertLevel]);
+  Serial.println(statusLabels[currentAlertLevel]);
 }
 
 /* ============ SISTEMA DE PONTUACAO ===================== */
@@ -363,6 +618,7 @@ void updateDisplay() {
 
   switch (currentScreen) {
     case SCREEN_DASHBOARD:    drawDashboard();    break;
+    case SCREEN_CLOCK:        drawClockScreen();  break;
     case SCREEN_VITALS:       drawVitals();       break;
     case SCREEN_CHECKUP:      drawCheckup();      break;
     case SCREEN_GAMIFICATION: drawGamification(); break;
@@ -378,8 +634,17 @@ void drawDashboard() {
   display.setTextSize(1);
   display.setTextColor(SSD1306_WHITE);
 
-  display.setCursor(20, 0);
-  display.println("== LEVEL UP ==");
+  char timeStr[6];
+  sprintf(timeStr, "%02d:%02d", clockH, clockM);
+  display.setCursor(0, 0);
+  display.print(timeStr);
+
+  display.setCursor(40, 0);
+  display.print("LEVEL UP");
+
+  display.setCursor(104, 0);
+  display.print("Lv");
+  display.print(game.level);
   display.drawFastHLine(0, 9, 128, SSD1306_WHITE);
 
   display.setCursor(0, 13);
@@ -398,9 +663,6 @@ void drawDashboard() {
   drawProgressBar(0, 35, 128, 7, health.activityLevel);
 
   display.setCursor(0, 46);
-  display.print("Lv.");
-  display.print(game.level);
-  display.print(" ");
   display.print(game.rank);
 
   display.setCursor(0, 56);
@@ -409,6 +671,39 @@ void drawDashboard() {
 
   display.setCursor(78, 56);
   display.print("[Menu>]");
+}
+
+/* ============ TELA: RELOGIO ============================ */
+void drawClockScreen() {
+  display.setTextSize(1);
+  display.setTextColor(SSD1306_WHITE);
+
+  display.setCursor(28, 0);
+  display.println("= RELOGIO =");
+  display.drawFastHLine(0, 9, 128, SSD1306_WHITE);
+
+  display.setTextSize(3);
+  char hm[6];
+  sprintf(hm, "%02d:%02d", clockH, clockM);
+  display.setCursor(4, 16);
+  display.print(hm);
+
+  display.setTextSize(2);
+  char sec[3];
+  sprintf(sec, "%02d", clockS);
+  display.setCursor(100, 20);
+  display.print(sec);
+
+  display.setTextSize(1);
+  display.drawFastHLine(0, 42, 128, SSD1306_WHITE);
+
+  display.setCursor(0, 46);
+  display.print("WiFi: ");
+  display.println(ap_ssid);
+
+  display.setCursor(0, 56);
+  display.print("IP: ");
+  display.print(WiFi.softAPIP());
 }
 
 /* ============ TELA: SINAIS VITAIS ====================== */
