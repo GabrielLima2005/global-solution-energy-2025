@@ -167,7 +167,7 @@ def scene_abertura(t, dur):
     inst_a = ease_out(min(1, t / 0.5))
     text_c(draw, 'FIAP — Faculdade de Informática e Administração Paulista', 80,
            get_font(20), color=(100, 110, 140), alpha=inst_a)
-    text_c(draw, '1º Ano — Ciência da Computação — 2025', 110,
+    text_c(draw, '1º Ano — Ciência da Computação — 2026', 110,
            get_font(16), color=(80, 90, 120), alpha=inst_a)
 
     # Title
@@ -572,25 +572,25 @@ def scene_cronograma(t, dur):
 
     # Timeline
     phases = [
-        ('Sprint 1', 'MAR-ABR 2025', [
+        ('Sprint 1', 'MAR-ABR 2026', [
             'Definição do projeto Level UP',
             'Circuito ESP32 no Wokwi',
             'Sensores + LEDs + OLED',
             'Check-up digital (8 perguntas)',
         ], (0, 200, 150), True),
-        ('Sprint 2', 'ABR-MAI 2025', [
+        ('Sprint 2', 'ABR-MAI 2026', [
             'WiFi Access Point',
             'Dashboard Web (HTML/JS)',
             'API REST (/api/data)',
             'Relógio em tempo real',
         ], (0, 163, 255), True),
-        ('Sprint 3', 'MAI-JUN 2025', [
+        ('Sprint 3', 'MAI-JUN 2026', [
             'Relatório lógica digital',
             'Documentação ABNT',
             'Vídeo pitch',
             'Testes e refinamentos',
         ], (251, 191, 36), True),
-        ('Futuro', 'JUL+ 2025', [
+        ('Futuro', 'JUL+ 2026', [
             'App mobile nativo',
             'Integração wearables reais',
             'IA preditiva (ML)',
@@ -1084,7 +1084,7 @@ def scene_encerramento(t, dur):
     # Institution
     if t > 6.0:
         inst_a = ease_out(min(1, (t - 6.0) / 0.5))
-        text_c(draw, 'FIAP — 1º Ano Ciência da Computação — PCP Sprint 3 — 2025', 730,
+        text_c(draw, 'FIAP — 1º Ano Ciência da Computação — PCP Sprint 3 — 2026', 730,
                get_font(14), color=(70, 80, 100), alpha=inst_a)
         text_c(draw, 'Prof. Sandro  |  Prof. Allan Roberto Molto', 755,
                get_font(14), color=(70, 80, 100), alpha=inst_a)
