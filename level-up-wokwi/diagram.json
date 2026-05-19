@@ -1,0 +1,138 @@
+{
+  "version": 1,
+  "author": "Level UP - Health Monitoring System",
+  "editor": "wokwi",
+  "parts": [
+    {
+      "type": "wokwi-esp32-devkit-v1",
+      "id": "esp",
+      "top": 0,
+      "left": 200,
+      "attrs": {}
+    },
+    {
+      "type": "board-ssd1306",
+      "id": "oled",
+      "top": -180,
+      "left": 230,
+      "attrs": { "i2cAddress": "0x3C" }
+    },
+    {
+      "type": "wokwi-dht22",
+      "id": "dht",
+      "top": -80,
+      "left": -40,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-potentiometer",
+      "id": "pot_hr",
+      "top": 60,
+      "left": -80,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-potentiometer",
+      "id": "pot_act",
+      "top": 180,
+      "left": -80,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-led",
+      "id": "led_green",
+      "top": -40,
+      "left": 520,
+      "attrs": { "color": "green" }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r_green",
+      "top": -20,
+      "left": 440,
+      "rotate": 90,
+      "attrs": { "value": "220" }
+    },
+    {
+      "type": "wokwi-led",
+      "id": "led_yellow",
+      "top": 40,
+      "left": 520,
+      "attrs": { "color": "yellow" }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r_yellow",
+      "top": 60,
+      "left": 440,
+      "rotate": 90,
+      "attrs": { "value": "220" }
+    },
+    {
+      "type": "wokwi-led",
+      "id": "led_red",
+      "top": 120,
+      "left": 520,
+      "attrs": { "color": "red" }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r_red",
+      "top": 140,
+      "left": 440,
+      "rotate": 90,
+      "attrs": { "value": "220" }
+    },
+    {
+      "type": "wokwi-buzzer",
+      "id": "buzzer",
+      "top": 220,
+      "left": 500,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-pushbutton",
+      "id": "btn_menu",
+      "top": 340,
+      "left": 180,
+      "attrs": { "color": "blue" }
+    },
+    {
+      "type": "wokwi-pushbutton",
+      "id": "btn_select",
+      "top": 340,
+      "left": 320,
+      "attrs": { "color": "green" }
+    }
+  ],
+  "connections": [
+    ["esp:D21", "oled:SDA", "blue", []],
+    ["esp:D22", "oled:SCL", "purple", []],
+    ["esp:3V3", "oled:VCC", "red", []],
+    ["esp:GND.1", "oled:GND", "black", []],
+    ["esp:D4", "dht:SDA", "green", []],
+    ["esp:3V3", "dht:VCC", "red", []],
+    ["esp:GND.1", "dht:GND", "black", []],
+    ["esp:D34", "pot_hr:SIG", "orange", []],
+    ["esp:3V3", "pot_hr:VCC", "red", []],
+    ["esp:GND.1", "pot_hr:GND", "black", []],
+    ["esp:D35", "pot_act:SIG", "orange", []],
+    ["esp:3V3", "pot_act:VCC", "red", []],
+    ["esp:GND.2", "pot_act:GND", "black", []],
+    ["esp:D25", "r_green:1", "green", []],
+    ["r_green:2", "led_green:A", "green", []],
+    ["led_green:C", "esp:GND.2", "black", []],
+    ["esp:D26", "r_yellow:1", "gold", []],
+    ["r_yellow:2", "led_yellow:A", "gold", []],
+    ["led_yellow:C", "esp:GND.2", "black", []],
+    ["esp:D27", "r_red:1", "red", []],
+    ["r_red:2", "led_red:A", "red", []],
+    ["led_red:C", "esp:GND.2", "black", []],
+    ["esp:D33", "buzzer:1", "brown", []],
+    ["buzzer:2", "esp:GND.2", "black", []],
+    ["esp:D18", "btn_menu:1.l", "blue", []],
+    ["btn_menu:2.l", "esp:GND.2", "black", []],
+    ["esp:D19", "btn_select:1.l", "cyan", []],
+    ["btn_select:2.l", "esp:GND.2", "black", []]
+  ]
+}
